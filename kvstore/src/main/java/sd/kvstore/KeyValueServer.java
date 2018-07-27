@@ -36,18 +36,44 @@ public class KeyValueServer {
     CopycatServer server = CopycatServer.builder(address)
         .withStateMachine(KeyValueStore::new)
         .withTransport(NettyTransport.builder().withThreads(4).build())
-        .withStorage(Storage.builder().withDirectory(new File("/home/arthurvtr/Desktop/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs")).withStorageLevel(StorageLevel.DISK).build())
+        .withStorage(Storage.builder().withDirectory(new File("/home/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs")).withStorageLevel(StorageLevel.DISK).build())
         .build();
 
     server.bootstrap().thenAccept(srvr -> LOG.info(srvr + " has bootstrapped a cluster")).join();
-
+    
+    Address clusterAddress = new Address("localhost", 5000);
+    server.join(clusterAddress).thenAccept(srvr -> System.out.println(srvr + " has joined the cluster"));
+    
+    // Add two new servers to clust
+    Address server1Address = new Address("localhost", 5001);
+    CopycatServer server1 = CopycatServer.builder(server1Address)
+            .withStateMachine(KeyValueStore::new)
+            .withTransport(NettyTransport.builder().withThreads(4).build())
+            .withStorage(Storage.builder().withDirectory(new File("/home/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs")).withStorageLevel(StorageLevel.DISK).build())
+            .build();
+    
+    server1.join(clusterAddress).thenAccept(srvr -> System.out.println(srvr + " has joined the cluster"));
+    
+    Address server2Address = new Address("localhost", 5002);
+    CopycatServer server2 = CopycatServer.builder(server2Address)
+            .withStateMachine(KeyValueStore::new)
+            .withTransport(NettyTransport.builder().withThreads(4).build())
+            .withStorage(Storage.builder().withDirectory(new File("/home/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs")).withStorageLevel(StorageLevel.DISK).build())
+            .build();
+    
+    server2.join(clusterAddress).thenAccept(srvr -> System.out.println(srvr + " has joined the cluster"));
+    
+    // Waiting for synchronization of servers in cluster.
+    Thread.sleep(5000);
+    
+    
     // Create a client
     CopycatClient client = CopycatClient.builder()
         .withTransport(NettyTransport.builder().withThreads(2).build())
         .build();
 
     // Connect to the server
-    client.connect(address).join();
+    client.connect(clusterAddress).join();
 
     // Submit operations
     client.submit(new Put("foo", "Hello world!")).thenRun(() -> LOG.info("Put succeeded")).join();
@@ -68,7 +94,7 @@ public class KeyValueServer {
   }
 
   private static void deleteLogs() throws Throwable {
-    Files.walkFileTree(new File("/home/arthurvtr/Desktop/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs").toPath(), new SimpleFileVisitor<Path>() {
+    Files.walkFileTree(new File("/home/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs").toPath(), new SimpleFileVisitor<Path>() {
       @Override
       public FileVisitResult visitFile(final Path file, final BasicFileAttributes attrs) throws IOException {
         Files.delete(file);
