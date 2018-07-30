@@ -7,6 +7,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
+import java.util.concurrent.CompletableFuture;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +18,7 @@ import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.transport.netty.NettyTransport;
 import io.atomix.copycat.client.CopycatClient;
 import io.atomix.copycat.server.CopycatServer;
+import io.atomix.copycat.server.cluster.Member.Type;
 import io.atomix.copycat.server.storage.Storage;
 import io.atomix.copycat.server.storage.StorageLevel;
 
@@ -36,32 +40,59 @@ public class KeyValueServer {
     CopycatServer server = CopycatServer.builder(address)
         .withStateMachine(KeyValueStore::new)
         .withTransport(NettyTransport.builder().withThreads(4).build())
-        .withStorage(Storage.builder().withDirectory(new File("/home/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs")).withStorageLevel(StorageLevel.DISK).build())
+        .withStorage(Storage.builder().withDirectory(new File("/local/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs")).withStorageLevel(StorageLevel.DISK).build())
         .build();
 
     server.bootstrap().thenAccept(srvr -> LOG.info(srvr + " has bootstrapped a cluster")).join();
     
     Address clusterAddress = new Address("localhost", 5000);
     server.join(clusterAddress).thenAccept(srvr -> System.out.println(srvr + " has joined the cluster"));
-    
-    // Add two new servers to clust
+    // Add two new servers to cluster
     Address server1Address = new Address("localhost", 5001);
     CopycatServer server1 = CopycatServer.builder(server1Address)
             .withStateMachine(KeyValueStore::new)
             .withTransport(NettyTransport.builder().withThreads(4).build())
-            .withStorage(Storage.builder().withDirectory(new File("/home/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs")).withStorageLevel(StorageLevel.DISK).build())
+            .withStorage(Storage.builder().withDirectory(new File("/local/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs")).withStorageLevel(StorageLevel.DISK).build())
             .build();
     
     server1.join(clusterAddress).thenAccept(srvr -> System.out.println(srvr + " has joined the cluster"));
     
-    Address server2Address = new Address("localhost", 5002);
-    CopycatServer server2 = CopycatServer.builder(server2Address)
-            .withStateMachine(KeyValueStore::new)
-            .withTransport(NettyTransport.builder().withThreads(4).build())
-            .withStorage(Storage.builder().withDirectory(new File("/home/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs")).withStorageLevel(StorageLevel.DISK).build())
-            .build();
-    
-    server2.join(clusterAddress).thenAccept(srvr -> System.out.println(srvr + " has joined the cluster"));
+//    Address server2Address = new Address("localhost", 5002);
+//    CopycatServer server2 = CopycatServer.builder(server2Address)
+//            .withStateMachine(KeyValueStore::new)
+//            .withTransport(NettyTransport.builder().withThreads(4).build())
+//            .withStorage(Storage.builder().withDirectory(new File("/local/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs")).withStorageLevel(StorageLevel.DISK).build())
+//            .build();
+//    
+//    server2.join(clusterAddress).thenAccept(srvr -> System.out.println(srvr + " has joined the cluster"));
+//    
+//    Address server3Address = new Address("localhost", 5003);
+//    CopycatServer server3 = CopycatServer.builder(server3Address)
+//            .withStateMachine(KeyValueStore::new)
+//            .withTransport(NettyTransport.builder().withThreads(4).build())
+//            .withStorage(Storage.builder().withDirectory(new File("/local/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs")).withStorageLevel(StorageLevel.DISK).build())
+//            .build();
+//    
+//    server3.join(clusterAddress).thenAccept(srvr -> System.out.println(srvr + " has joined the cluster"));
+//    
+//    Address server4Address = new Address("localhost", 5004);
+//    CopycatServer server4 = CopycatServer.builder(server4Address)
+//            .withStateMachine(KeyValueStore::new)
+//            .withTransport(NettyTransport.builder().withThreads(4).build())
+//            .withStorage(Storage.builder().withDirectory(new File("/local/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs")).withStorageLevel(StorageLevel.DISK).build())
+//            .build();
+//    
+//    server4.join(clusterAddress).thenAccept(srvr -> System.out.println(srvr + " has joined the cluster"));
+//    
+//    
+//    Address server5Address = new Address("localhost", 5005);
+//    CopycatServer server5 = CopycatServer.builder(server5Address)
+//            .withStateMachine(KeyValueStore::new)
+//            .withTransport(NettyTransport.builder().withThreads(4).build())
+//            .withStorage(Storage.builder().withDirectory(new File("/local/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs")).withStorageLevel(StorageLevel.DISK).build())
+//            .build();
+//    
+//    server5.join(clusterAddress).thenAccept(srvr -> System.out.println(srvr + " has joined the cluster"));
     
     // Waiting for synchronization of servers in cluster.
     Thread.sleep(5000);
@@ -76,11 +107,48 @@ public class KeyValueServer {
     client.connect(clusterAddress).join();
 
     // Submit operations
-    client.submit(new Put("foo", "Hello world!")).thenRun(() -> LOG.info("Put succeeded")).join();
-    client.submit(new Get("foo")).thenAccept(result -> LOG.info("foo is: " + result)).join();
-    client.submit(new Delete("foo")).thenRun(() -> LOG.info("foo has been deleted")).join();
-
-    // Install listeners
+   
+    for (int i = 0; i <= 1; i++) {
+    	client.submit(new Put(i, "test")).thenRun(() -> LOG.info("Put succeeded")).join();
+    }
+    
+   
+    Thread thread = new Thread(){
+    	boolean isBlocked = false;;
+        Calendar data1;
+        Calendar data2;
+        public void run(){
+          while (true) {
+        	  try {
+        		  //thenAccept(result -> LOG.info("get"))
+        		  client.submit(new Get(1)).join();
+        		  if (isBlocked) {
+        			  isBlocked = false;
+        			  data2 = new GregorianCalendar();
+        			  System.out.println("TEMPO DE RECUPERACAO:");
+        			  System.out.println(data2.getTimeInMillis() - data1.getTimeInMillis());
+        			  System.out.println(data2.getTimeInMillis());
+        			  System.out.println(data1.getTimeInMillis());
+        		  }
+			} catch (Exception e) {
+				if (isBlocked == false) {
+					data1 = new GregorianCalendar();
+				}
+				isBlocked = true;
+				
+			}
+        	  
+          }
+        }
+     };
+     
+    System.out.println(server.cluster().leader().address().port());
+    
+    thread.start();
+    
+    server.leave();
+   
+    //Install listeners
     client.submit(new Listen()).thenRun(() -> LOG.info("listener registered")).join();
     client.onEvent("put", (EntryEvent event) -> LOG.info("put event received for: " + event.key));
     client.onEvent("delete", (EntryEvent event) -> LOG.info("delete event received for: " + event.key));
@@ -91,10 +159,11 @@ public class KeyValueServer {
     client.submit(new Get("foo")).join();
     client.submit(new Delete("foo")).join();
     client.submit(new PutWithTtl("foo", "bar", 1000)).join();
+
   }
 
   private static void deleteLogs() throws Throwable {
-    Files.walkFileTree(new File("/home/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs").toPath(), new SimpleFileVisitor<Path>() {
+    Files.walkFileTree(new File("/local/mafra/workspace/distributed-datastore/kvstore/src/main/java/sd/kvstore/logs").toPath(), new SimpleFileVisitor<Path>() {
       @Override
       public FileVisitResult visitFile(final Path file, final BasicFileAttributes attrs) throws IOException {
         Files.delete(file);
